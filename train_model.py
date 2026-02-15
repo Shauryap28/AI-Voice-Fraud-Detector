@@ -1,12 +1,21 @@
 import os
-import io
-import soundfile as sf
 import numpy as np
-import librosa
-from app.inference import extract_features_from_audio
+from app.feature_extractor import extract_wav2vec_features
+from app.utils import preprocess_audio
+
+from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, f1_score
+import joblib
 
 DATASET_ROOT = "Dataset"
 
+
+# -----------------------------
+# Collect samples
+# -----------------------------
 def collect_samples():
     samples = []
 
@@ -21,50 +30,28 @@ def collect_samples():
                     samples.append({
                         "path": os.path.join(lang_dir, fname),
                         "label": label_value,
-                        "language": language,
-                        "ext": os.path.splitext(fname)[1].lower()
+                        "language": language
                     })
 
     return samples
 
 
-
-
-def preprocess_audio_for_training(path: str, target_sr=16000):
-    waveform, sr = sf.read(path)
-
-    if waveform.ndim == 2:
-        waveform = np.mean(waveform, axis=1)
-
-    if sr != target_sr:
-        waveform = librosa.resample(
-    y=waveform,
-    orig_sr=sr,
-    target_sr=target_sr
-)
-
-
-    return waveform.astype(np.float32), target_sr
-
-
-
-
-
-def extract_wav2vec_features(samples):
+# -----------------------------
+# Feature extraction
+# -----------------------------
+def extract_wav2vec_features2(samples):
     X = []
     y = []
     skipped = 0
-    no = 0
-    for s in samples:
-        
+
+    for i, s in enumerate(samples):
         try:
-            waveform, sr = preprocess_audio_for_training(s["path"])
-            features = extract_features_from_audio(waveform, sr)
+            waveform, sr = preprocess_audio(s["path"])
+            features = extract_wav2vec_features(waveform, sr)
 
             X.append(features)
             y.append(s["label"])
-            no = no+1
-            print(f"Done {no}")
+            print(f"Done {i+1}/{len(samples)}")
 
         except Exception as e:
             skipped += 1
@@ -74,11 +61,20 @@ def extract_wav2vec_features(samples):
     return np.array(X), np.array(y)
 
 
-from sklearn.model_selection import train_test_split
-
+# -----------------------------
+# Main training pipeline
+# -----------------------------
 samples = collect_samples()
-X, y = extract_wav2vec_features(samples)
+print("Total samples:", len(samples))
 
+X, y = extract_wav2vec_features2(samples)
+
+print("Class distribution:")
+print("Human:", np.sum(y == 0))
+print("AI:", np.sum(y == 1))
+
+
+# Split
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
@@ -87,44 +83,77 @@ X_train, X_test, y_train, y_test = train_test_split(
     stratify=y
 )
 
-from sklearn.decomposition import PCA
 
-pca = PCA(
-    n_components=64,
-    random_state=42
-)
+# -----------------------------
+# Scaling
+# -----------------------------
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-X_train_pca = pca.fit_transform(X_train)
-X_test_pca  = pca.transform(X_test)
+joblib.dump(scaler, "scaler.joblib")
+
+
+# -----------------------------
+# PCA with variance-based selection
+# -----------------------------
+pca = PCA(n_components=0.96, random_state=42)
+X_train_pca = pca.fit_transform(X_train_scaled)
+X_test_pca = pca.transform(X_test_scaled)
 
 print("Original dim:", X_train.shape[1])
 print("PCA dim:", X_train_pca.shape[1])
 print("Explained variance:", pca.explained_variance_ratio_.sum())
 
-import joblib
 joblib.dump(pca, "pca.joblib")
 
-from sklearn.linear_model import LogisticRegression
+from lightgbm import LGBMClassifier
 
-clf = LogisticRegression(
-    solver="liblinear",
-    max_iter=1000
-)
+models = {
+    "LogisticRegression": LogisticRegression(
+        solver="liblinear",
+        max_iter=1000,
+        random_state=42
+    ),
+    "LightGBM": LGBMClassifier(
+        n_estimators=300,
+        learning_rate=0.05,
+        num_leaves=31,
+        random_state=42
+    )
+}
 
-clf.fit(X_train_pca, y_train)
+best_model = None
+best_score = -1
+best_name = ""
 
-from sklearn.metrics import classification_report, confusion_matrix
+for name, model in models.items():
+    print(f"\nTraining {name}...")
+    model.fit(X_train_pca, y_train)
 
-y_pred = clf.predict(X_test_pca)
+    y_pred = model.predict(X_test_pca)
 
-print(confusion_matrix(y_test, y_pred))
-print(classification_report(
-    y_test,
-    y_pred,
-    target_names=["HUMAN", "AI_GENERATED"]
-))
+    acc = accuracy_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
 
-joblib.dump(clf, "classifier.joblib")
+    print(f"\n{name} Results:")
+    print(confusion_matrix(y_test, y_pred))
+    print(classification_report(
+        y_test,
+        y_pred,
+        target_names=["HUMAN", "AI_GENERATED"]
+    ))
+    print("Accuracy:", acc)
+    print("F1 Score:", f1)
+
+    # Track best model
+    if f1 > best_score:
+        best_score = f1
+        best_model = model
+        best_name = name
 
 
-
+# Save best model
+print(f"\nBest model: {best_name} | F1: {best_score:.4f}")
+joblib.dump(best_model, "classifier.joblib")
+print("Best model saved as classifier.joblib")

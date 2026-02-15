@@ -3,6 +3,8 @@ import os
 from fastapi.responses import JSONResponse
 from fastapi import FastAPI, HTTPException, Request
 from app.rate_limiter import rate_limit
+import hashlib
+from cachetools import TTLCache
 
 
 
@@ -19,6 +21,11 @@ from app.security import validate_api_key
 from app.inference import predict_voice
 
 app = FastAPI()
+
+
+# cache: max 1000 items
+prediction_cache = TTLCache(maxsize=1000, ttl=300)
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -49,17 +56,27 @@ def voice_detection_endpoint(
 
         
     try:
-        classification, confidence, explanation = predict_voice(
-            request.audioBase64
-        )
+        # create hash key from audio
+        audio_hash = hashlib.sha256(request.audioBase64.encode()).hexdigest()
+
+        # check cache
+        if audio_hash in prediction_cache:
+            classification, confidence = prediction_cache[audio_hash]
+        else:
+            classification, confidence = predict_voice(
+                request.audioBase64
+            )
+            prediction_cache[audio_hash] = (
+                classification,
+                confidence
+                )
 
         return VoiceDetectionResponse(
             status="success",
-            language=request.language,
             classification=classification,
             confidenceScore=round(confidence, 2),
-            explaination=explanation
         )
+
 
     except ValueError as e:
        return JSONResponse(

@@ -13,10 +13,8 @@ class VoiceDetectionRequest(BaseModel):
 
 class VoiceDetectionResponse(BaseModel):
     status: Literal["success"]
-    language: Literal["Tamil", "English", "Hindi", "Malayalam", "Telugu"]
     classification: Literal["AI_GENERATED", "HUMAN"]
     confidenceScore: float = Field(..., ge=0.0, le=1.0)
-    explaination: str
 
 
 class ErrorResponse(BaseModel):

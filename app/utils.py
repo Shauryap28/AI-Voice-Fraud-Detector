@@ -1,117 +1,93 @@
 import base64
 import io
 import numpy as np
-import soundfile as sf
 import librosa
 import binascii
 import os
 
 
+# -----------------------------
+# Audio trimming and padding
+# -----------------------------
+def trim_audio(waveform, sr, max_duration=12):
+    max_samples = int(max_duration * sr)
+
+    if len(waveform) > max_samples:
+        waveform = waveform[:max_samples]
+    else:
+        pad_amount = max_samples - len(waveform)
+        waveform = np.pad(waveform, (0, pad_amount))
+
+    return waveform
+
+
+
+# -----------------------------
+# Input type detection
+# -----------------------------
 def detect_audio_input_type(input_value: str) -> str:
     """
     Returns one of:
     - 'wav_path'
-    - 'base64_mp3'
+    - 'mp3_path'
     - 'base64_wav'
+    - 'base64_mp3'
     Raises ValueError if unknown.
     """
 
-    # 1️⃣ File path check (WAV on disk)
+    # File path check
     if os.path.isfile(input_value):
-        return "wav_path"
+        ext = os.path.splitext(input_value)[1].lower()
 
-    # 2️⃣ Try Base64 decode
+        if ext == ".wav":
+            return "wav_path"
+        elif ext == ".mp3":
+            return "mp3_path"
+        else:
+            raise ValueError("Unsupported file format")
+
+    # Try Base64 decode
     try:
         audio_bytes = base64.b64decode(input_value, validate=True)
     except (binascii.Error, ValueError):
-        raise ValueError("Input is neither a file path nor valid Base64")
+        raise ValueError("Input is neither a valid file path nor Base64")
 
-    # 3️⃣ Inspect decoded bytes
+    # Detect WAV
     if audio_bytes.startswith(b"RIFF") and b"WAVE" in audio_bytes[:12]:
         return "base64_wav"
 
+    # Detect MP3
     if (
         audio_bytes.startswith(b"ID3")
         or audio_bytes[:2] in [b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"]
     ):
         return "base64_mp3"
 
-    raise ValueError("Unsupported Base64 audio format")
+    raise ValueError("Unsupported audio format")
 
 
+# -----------------------------
+# Unified preprocessing
+# -----------------------------
+def preprocess_audio(input_value: str, target_sr: int = 16000):
+    input_type = detect_audio_input_type(input_value)
 
+    # Base64 case
+    if input_type in ["base64_wav", "base64_mp3"]:
+        audio_bytes = base64.b64decode(input_value)
+        buffer = io.BytesIO(audio_bytes)
+        waveform, _ = librosa.load(buffer, sr=target_sr, mono=True)
+    else:
+        waveform, _ = librosa.load(input_value, sr=target_sr, mono=True)
 
+    # remove leading/trailing silence
+    waveform, _ = librosa.effects.trim(waveform, top_db=30)
 
-def preprocess_audio_base64(
-    audio_base64: str,
-    target_sr: int = 16000
-):
-    """
-    Compliant preprocessing:
-    - Decodes Base64 MP3
-    - Converts to waveform
-    - Converts to mono if needed
-    - Resamples to 16kHz
-    DOES NOT modify audio content
-    """
+    # fixed-length trim/pad
+    waveform = trim_audio(waveform, sr=target_sr)
 
-    # 1. Base64 → bytes
-    audio_bytes = base64.b64decode(audio_base64)
-
-    # 2. Bytes → audio waveform
-    audio_buffer = io.BytesIO(audio_bytes)
-    waveform, sr = librosa.load(audio_buffer, sr=target_sr, mono=True)
-
-
-
-    # 5. Ensure float32 (model requirement)
-    waveform = waveform.astype(np.float32)
-
-    return waveform, target_sr
-
-
-
-
-def preprocess_audio_wav(
-    wav_path: str,
-    target_sr: int = 16000
-):
-    """
-    Preprocess WAV input:
-    - Loads WAV from disk
-    - Converts to mono if needed
-    - Resamples to 16kHz
-    DOES NOT modify audio content
-    """
-
-    # 1. Load WAV
-    waveform, sr = sf.read(wav_path)
-
-    # 2. Stereo → mono
-    if waveform.ndim == 2:
-        waveform = np.mean(waveform, axis=1)
-
-    # 3. Resample
-    if sr != target_sr:
-        waveform = librosa.resample(
-            waveform,
-            orig_sr=sr,
-            target_sr=target_sr
-        )
+    # normalize amplitude
+    waveform = waveform / (np.max(np.abs(waveform)) + 1e-9)
 
     return waveform.astype(np.float32), target_sr
 
-def preprocess_audio_auto(input_value: str):
-    input_type = detect_audio_input_type(input_value)
-
-    if input_type == "wav_path":
-        return preprocess_audio_wav(input_value)
-
-    if input_type == "base64_mp3":
-        return preprocess_audio_base64(input_value)
-
-    if input_type == "base64_wav":
-        # optional: if you ever allow this
-        return preprocess_audio_base64(input_value)
-
-    raise ValueError("Unsupported input type")
