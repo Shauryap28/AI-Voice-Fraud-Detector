@@ -1,220 +1,162 @@
-Voice Authenticity Detection API
+# AI Voice Fraud Detector
 
-A lightweight FastAPI-based service that detects whether a voice recording is human or AI-generated using Wav2Vec2 embeddings and a machine learning classifier.
+AI-powered system that detects whether an audio recording is **Human speech or AI-generated speech** using **Wav2Vec2 embeddings and a machine learning classifier**.
 
-Features
+This project was developed during the **India AI Impact Buildathon**, where our team ranked in the **Top 2% among 40,000+ participants across India**.
 
-Accepts Base64-encoded audio
+---
 
-Detects AI-generated vs human voice
+## 🏆 Achievement
 
-Uses Wav2Vec2 deep audio embeddings
+**Top 2% National Finalist – India AI Impact Buildathon**
 
-Scikit-learn classifier with PCA
+![Finalist Certificate](Certificate/HCL GUVI Certification - 148i0k54718g7C1j1x.png)
 
-API key authentication
+---
 
-Rate limiting
+## Project Overview
 
-Response caching
+This project provides a **FastAPI-based voice authenticity detection API** that classifies audio recordings as **human or AI-generated**.
 
-Project Structure
+The system accepts **Base64 encoded audio**, extracts deep speech embeddings using **Wav2Vec2**, and applies a trained machine learning classifier to generate a prediction along with a **confidence score**.
+
+This system can be used to detect:
+
+* AI-generated voice
+* Deepfake speech
+* Synthetic audio fraud
+
+---
+
+## Key Features
+
+* Accepts **Base64 encoded audio input**
+* Classifies **Human vs AI-generated speech**
+* Uses **Wav2Vec2 deep audio embeddings**
+* Machine learning classifier with **PCA dimensionality reduction**
+* **FastAPI REST API**
+* **API key authentication**
+* **Rate limiting**
+* **Prediction caching**
+
+---
+
+## Model Pipeline
+
+1. **Audio preprocessing**
+
+   * Silence trimming
+   * Audio normalization
+
+2. **Feature extraction**
+
+   * Wav2Vec2 model extracts deep speech embeddings
+
+3. **Feature processing**
+
+   * Feature scaling
+   * PCA dimensionality reduction
+
+4. **Classification**
+
+   * ML classifier predicts **Human vs AI-generated voice**
+
+5. **Output**
+
+   * Classification result
+   * Confidence score
+
+---
+
+## My Contributions
+
+* Collected and organized the **training dataset**
+* Assisted in **building and training the ML model**
+* Implemented the **Base64 audio classification pipeline**
+* Worked on **voice detection and evaluation**
+* Contributed to the **development and testing of the detection system**
+
+---
+
+## Project Structure
+
+```
 project-root/
 │
 ├── app/
-│   ├── models/                # Saved ML artifacts
+│   ├── models/
 │   │   ├── scaler.joblib
 │   │   ├── pca.joblib
 │   │   └── classifier.joblib
 │   │
-│   ├── feature_extractor.py  # Wav2Vec2 feature extraction
-│   ├── inference.py          # Prediction pipeline
-│   ├── main.py               # FastAPI application
-│   ├── rate_limiter.py       # API rate limiting
-│   ├── schemas.py            # Request/response models
-│   ├── security.py           # API key validation
-│   └── utils.py              # Audio preprocessing
+│   ├── feature_extractor.py
+│   ├── inference.py
+│   ├── main.py
+│   ├── rate_limiter.py
+│   ├── schemas.py
+│   ├── security.py
+│   └── utils.py
 │
-├── Dataset/                  # Training dataset
+├── Dataset/
 │
-├── train_model.py            # Model training script
+├── train_model.py
 ├── requirements.txt
-├── .env
 └── README.md
+```
 
-Requirements
+---
 
-Python 3.9+
+## Technologies Used
 
-pip
+* Python
+* FastAPI
+* PyTorch
+* HuggingFace Transformers
+* Wav2Vec2
+* Scikit-learn
+* LightGBM
+* Librosa
 
-virtualenv (recommended)
+---
 
-Setup Instructions
-1. Clone the repository
-git clone <repo-url>
-cd <project-folder>
+## API Endpoint
 
-2. Create virtual environment
+### POST `/api/voice-detection`
 
-Mac/Linux
+Detect whether the audio is **AI-generated or human voice**.
 
-python3 -m venv venv
-source venv/bin/activate
+#### Headers
 
-
-Windows
-
-python -m venv venv
-venv\Scripts\activate
-
-3. Install dependencies
-pip install -r requirements.txt
-
-4. Configure environment variables
-
-Create a .env file in the root directory:
-
-API_KEY=your_secret_api_key
-
-5. Ensure model files exist
-
-Inside:
-
-app/models/
-
-
-You must have:
-
-scaler.joblib
-pca.joblib
-classifier.joblib
-
-
-If not, train the model.
-
-Training the Model
-Dataset Structure
-Dataset/
-├── Human/
-│   ├── English/
-│   ├── Hindi/
-│   └── ...
-│
-└── AI/
-    ├── English/
-    ├── Hindi/
-    └── ...
-
-
-Each language folder contains .wav or .mp3 files.
-
-Run training
-python train_model.py
-
-
-After training, the following files will be generated:
-
-scaler.joblib
-pca.joblib
-classifier.joblib
-
-
-Move them to:
-
-app/models/
-
-Running the API
-
-Start the FastAPI server:
-
-uvicorn app.main:app --reload
-
-
-Server will run at:
-
-http://127.0.0.1:8000
-
-
-Interactive docs:
-
-http://127.0.0.1:8000/docs
-
-API Endpoint
-POST /api/voice-detection
-
-Detect whether audio is AI-generated or human.
-
-Headers
+```
 x-api-key: your_secret_api_key
 Content-Type: application/json
+```
 
-Request Body
+#### Request Body
+
+```
 {
   "language": "English",
   "audioFormat": "mp3",
   "audioBase64": "BASE64_AUDIO_STRING"
 }
+```
 
-Success Response
+#### Success Response
+
+```
 {
   "status": "success",
   "classification": "HUMAN",
   "confidenceScore": 0.92
 }
+```
 
-Error Response
-{
-  "status": "error",
-  "message": "Invalid API key"
-}
+---
 
-Rate Limiting
+## Example cURL Request
 
-15 requests per minute per API key
-
-If exceeded:
-
-{
-  "status": "error",
-  "message": "Too many requests. Please try again later."
-}
-
-Caching
-
-Predictions are cached for 5 minutes
-
-Prevents recomputation for identical audio
-
-Model Pipeline
-
-Audio preprocessing
-
-Silence trimming and normalization
-
-Wav2Vec2 embedding extraction
-
-Feature scaling
-
-PCA dimensionality reduction
-
-Classifier prediction
-
-Tech Stack
-
-FastAPI
-
-PyTorch
-
-HuggingFace Transformers
-
-Scikit-learn
-
-LightGBM
-
-Librosa
-
-Example cURL Request
+```
 curl -X POST "http://127.0.0.1:8000/api/voice-detection" \
 -H "x-api-key: your_secret_api_key" \
 -H "Content-Type: application/json" \
@@ -223,23 +165,29 @@ curl -X POST "http://127.0.0.1:8000/api/voice-detection" \
   "audioFormat": "mp3",
   "audioBase64": "BASE64_STRING"
 }'
+```
 
-Notes
+---
 
-Maximum audio length: 12 seconds
+## Notes
 
-Maximum audio size: 5 MB
+* Maximum audio length: **12 seconds**
+* Maximum audio size: **5 MB**
+* Supported formats: **MP3**
 
-Supported formats: MP3
+---
 
-Future Improvements
+## Future Improvements
 
-Redis-based rate limiting
+* Redis-based rate limiting
+* GPU batch inference
+* Torch-based classifier head
+* Multi-language calibration
+* Real-time streaming support
 
-GPU batch inference
+---
 
-Torch-based classifier head
+## Disclaimer
 
-Multi-language calibration
-
-Real-time streaming support
+This repository is a **fork of the original team submission for the India AI Impact Buildathon**.
+The project was developed collaboratively as part of a team effort.
