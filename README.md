@@ -348,11 +348,13 @@ curl -X POST "http://127.0.0.1:8000/api/voice-detection" \
 ---
 
 ## My Contributions
-Collected and organized the training dataset
-Assisted in building and training the ML model
-Implemented the Base64 audio classification pipeline
-Worked on voice detection and evaluation
-Contributed to the development and testing of the detection system
+
+* Collected and organized the **training dataset**
+* Assisted in **building and training the machine learning model**
+* Implemented the **Base64 audio classification pipeline**
+* Worked on **voice detection and evaluation**
+* Contributed to the **development and testing of the detection system**
+
 ---
 
 ## Disclaimer
