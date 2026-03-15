@@ -10,7 +10,7 @@ This project was developed during the **India AI Impact Buildathon**, where our 
 
 **Top 2% National Finalist – India AI Impact Buildathon**
 
-![Finalist Certificate](Certificate/HCL GUVI Certification - 148i0k54718g7C1j1x.png)
+(![Finalist Certificate](Certificate/HCL%20GUVI%20Certification%20-%20148i0k54718g7C1j1x.png))
 
 ---
 
