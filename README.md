@@ -1,4 +1,5 @@
 # AI Voice Fraud Detector
+Team Project – India AI Impact Buildathon (Top 2% Finalist)
 
 A lightweight **FastAPI-based Voice Authenticity Detection API** that determines whether a voice recording is **human or AI-generated** using **Wav2Vec2 embeddings and a machine learning classifier**.
 
